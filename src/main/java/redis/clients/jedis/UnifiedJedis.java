@@ -307,7 +307,9 @@ public class UnifiedJedis implements JedisCommands, JedisBinaryCommands,
     this.commandObjects.setProtocol(this.protocol);
   }
 
+// 定义一个泛型方法，接收一个CommandObject对象，返回一个T类型的对象
   public final <T> T executeCommand(CommandObject<T> commandObject) {
+    // 调用executor对象的executeCommand方法，传入commandObject对象，返回一个T类型的对象
     return executor.executeCommand(commandObject);
   }
 

@@ -39,9 +39,12 @@ public class ClusterConnectionProvider implements ConnectionProvider {
     initializeSlotsCache(clusterNodes, clientConfig);
   }
 
+// 构造函数，用于创建ClusterConnectionProvider对象
   public ClusterConnectionProvider(Set<HostAndPort> clusterNodes, JedisClientConfig clientConfig,
       GenericObjectPoolConfig<Connection> poolConfig) {
+    // 创建JedisClusterInfoCache对象，用于缓存集群节点信息
     this.cache = new JedisClusterInfoCache(clientConfig, poolConfig, clusterNodes);
+    // 初始化slots缓存
     initializeSlotsCache(clusterNodes, clientConfig);
   }
 
@@ -66,19 +69,26 @@ public class ClusterConnectionProvider implements ConnectionProvider {
   }
 
   private void initializeSlotsCache(Set<HostAndPort> startNodes, JedisClientConfig clientConfig) {
+    // 如果startNodes为空，则抛出异常
     if (startNodes.isEmpty()) {
       throw new JedisClusterOperationException("No nodes to initialize cluster slots cache.");
     }
 
+    // 将startNodes转换为ArrayList，并打乱顺序
     ArrayList<HostAndPort> startNodeList = new ArrayList<>(startNodes);
     Collections.shuffle(startNodeList);
 
+    // 定义一个JedisException变量，用于存储第一个异常
     JedisException firstException = null;
+    // 遍历startNodeList
     for (HostAndPort hostAndPort : startNodeList) {
       try (Connection jedis = new Connection(hostAndPort, clientConfig)) {
+        // 使用jedis连接，调用cache.discoverClusterNodesAndSlots方法，初始化集群槽位缓存
         cache.discoverClusterNodesAndSlots(jedis);
+        // 如果成功，则返回
         return;
       } catch (JedisException e) {
+        // 如果是第一个异常，则将其存储到firstException变量中
         if (firstException == null) {
           firstException = e;
         }
@@ -168,13 +178,14 @@ public class ClusterConnectionProvider implements ConnectionProvider {
   }
 
   public Connection getConnectionFromSlot(int slot) {
+    // 从缓存中获取指定槽位的连接池
     ConnectionPool connectionPool = cache.getSlotPool(slot);
     if (connectionPool != null) {
-      // It can't guaranteed to get valid connection because of node assignment
+      // 由于节点分配，无法保证获得有效的连接
       return connectionPool.getResource();
     } else {
-      // It's abnormal situation for cluster mode that we have just nothing for slot.
-      // Try to rediscover state
+      // 对于集群模式来说，没有插槽是很正常的。
+      // 尝试重新发现状态
       renewSlotCache();
       connectionPool = cache.getSlotPool(slot);
       if (connectionPool != null) {

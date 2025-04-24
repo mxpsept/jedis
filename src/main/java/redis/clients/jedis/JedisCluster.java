@@ -182,8 +182,10 @@ public class JedisCluster extends UnifiedJedis {
     this(clusterNodes, connectionTimeout, soTimeout, maxAttempts, null, poolConfig);
   }
 
+// 构造函数，用于创建JedisCluster对象
   public JedisCluster(Set<HostAndPort> clusterNodes, int connectionTimeout, int soTimeout,
       int maxAttempts, String password, GenericObjectPoolConfig<Connection> poolConfig) {
+    // 调用另一个构造函数，传入参数
     this(clusterNodes, connectionTimeout, soTimeout, maxAttempts, password, null, poolConfig);
   }
 
@@ -264,8 +266,10 @@ public class JedisCluster extends UnifiedJedis {
         Duration.ofMillis((long) clientConfig.getSocketTimeoutMillis() * maxAttempts), poolConfig);
   }
 
+// 构造函数，用于创建JedisCluster对象
   public JedisCluster(Set<HostAndPort> clusterNodes, JedisClientConfig clientConfig, int maxAttempts,
       Duration maxTotalRetriesDuration, GenericObjectPoolConfig<Connection> poolConfig) {
+    // 使用ClusterConnectionProvider创建连接提供者
     this(new ClusterConnectionProvider(clusterNodes, clientConfig, poolConfig), maxAttempts, maxTotalRetriesDuration,
         clientConfig.getRedisProtocol());
   }
@@ -344,9 +348,9 @@ public class JedisCluster extends UnifiedJedis {
   }
 
   /**
-   * Returns the connection for one of the 16,384 slots.
-   * @param slot the slot to retrieve the connection for.
-   * @return connection of the provided slot. {@code close()} of this connection must be called after use.
+   * 返回 16,384 个槽之一的连接。
+   * @param slot 要检索其连接的插槽。
+   * @return 提供的插槽的连接。 {@code close()} 必须在使用后调用此连接。
    */
   public Connection getConnectionFromSlot(int slot) {
     return ((ClusterConnectionProvider) provider).getConnectionFromSlot(slot);

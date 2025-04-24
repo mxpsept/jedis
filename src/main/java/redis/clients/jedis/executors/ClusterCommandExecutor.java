@@ -81,30 +81,39 @@ public class ClusterCommandExecutor implements CommandExecutor {
   }
 
   private <T> T doExecuteCommand(CommandObject<T> commandObject, boolean toReplica) {
+    // 计算最大重试期限
     Instant deadline = Instant.now().plus(maxTotalRetriesDuration);
 
+    // 初始化重定向异常、连续连接失败次数、最后一次异常
     JedisRedirectionException redirect = null;
     int consecutiveConnectionFailures = 0;
     Exception lastException = null;
+    // 循环重试，直到达到最大重试次数
     for (int attemptsLeft = this.maxAttempts; attemptsLeft > 0; attemptsLeft--) {
       Connection connection = null;
       try {
+        // 如果有重定向异常，则获取重定向节点的连接
         if (redirect != null) {
           connection = provider.getConnection(redirect.getTargetNode());
+          // 如果重定向异常是JedisAskDataException，则执行ASKING命令
           if (redirect instanceof JedisAskDataException) {
             // TODO: Pipeline asking with the original command to make it faster....
             connection.executeCommand(Protocol.Command.ASKING);
           }
         } else {
+          // 否则，根据toReplica参数获取主节点或从节点的连接
           connection = toReplica ? provider.getReplicaConnection(commandObject.getArguments())
               : provider.getConnection(commandObject.getArguments());
         }
 
+        // 执行命令
         return execute(connection, commandObject);
 
       } catch (JedisClusterOperationException jnrcne) {
+        // 如果是JedisClusterOperationException，则直接抛出
         throw jnrcne;
       } catch (JedisConnectionException jce) {
+        // 如果是JedisConnectionException，则记录最后一次异常，增加连续连接失败次数，并处理连接问题
         lastException = jce;
         ++consecutiveConnectionFailures;
         log.debug("Failed connecting to Redis: {}", connection, jce);
@@ -115,6 +124,7 @@ public class ClusterCommandExecutor implements CommandExecutor {
           redirect = null;
         }
       } catch (JedisRedirectionException jre) {
+        // 如果是JedisRedirectionException，则记录最后一次异常，重置连续连接失败次数，并处理重定向
         // avoid updating lastException if it is a connection exception
         if (lastException == null || lastException instanceof JedisRedirectionException) {
           lastException = jre;
@@ -122,19 +132,22 @@ public class ClusterCommandExecutor implements CommandExecutor {
         log.debug("Redirected by server to {}", jre.getTargetNode());
         consecutiveConnectionFailures = 0;
         redirect = jre;
-        // if MOVED redirection occurred,
+        // 如果发生 MOVED 重定向，
         if (jre instanceof JedisMovedDataException) {
-          // it rebuilds cluster's slot cache recommended by Redis cluster specification
+          // 重建 Redis 集群规范推荐的集群槽缓存
           provider.renewSlotCache(connection);
         }
       } finally {
+        // 关闭连接
         IOUtils.closeQuietly(connection);
       }
+      // 如果当前时间超过最大重试期限，则抛出异常
       if (Instant.now().isAfter(deadline)) {
         throw new JedisClusterOperationException("Cluster retry deadline exceeded.", lastException);
       }
     }
 
+    // 如果达到最大重试次数，则抛出异常
     JedisClusterOperationException maxAttemptsException
         = new JedisClusterOperationException("No more cluster attempts left.");
     maxAttemptsException.addSuppressed(lastException);
